@@ -1,0 +1,143 @@
+openapi: 3.0.0
+info:
+  title: PyMax API Methods
+  description: Схема методов неофициальной библиотеки PyMax для мессенджера Max.
+  version: 1.0.0
+
+paths:
+  /messages/send:
+    post:
+      summary: Отправить сообщение
+      operationId: send_message
+      parameters:
+        - name: chat_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text:
+                  type: string
+                notify:
+                  type: boolean
+                  default: true
+                reply_to:
+                  type: integer
+                use_queue:
+                  type: boolean
+
+  /messages/edit:
+    post:
+      summary: Редактировать сообщение
+      operationId: edit_message
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                chat_id:
+                  type: integer
+                message_id:
+                  type: integer
+                text:
+                  type: string
+
+  /messages/delete:
+    post:
+      summary: Удалить сообщения
+      operationId: delete_message
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                chat_id:
+                  type: integer
+                message_ids:
+                  type: array
+                  items:
+                    type: integer
+                for_me:
+                  type: boolean
+
+  /history/fetch:
+    get:
+      summary: Получить историю сообщений
+      operationId: fetch_history
+      parameters:
+        - name: chat_id
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: from_time
+          in: query
+          schema:
+            type: integer
+        - name: forward
+          in: query
+          schema:
+            type: integer
+        - name: backward
+          in: query
+          schema:
+            type: integer
+
+  /channels/create:
+    post:
+      summary: Создать канал
+      operationId: create_channel
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+
+  /reactions/add:
+    post:
+      summary: Добавить реакцию
+      operationId: add_reaction
+      parameters:
+        - name: chat_id
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: message_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: reaction
+          in: query
+          required: true
+          schema:
+            type: string
+
+components:
+  schemas:
+    Message:
+      type: object
+      properties:
+        id:
+          type: integer
+        chat_id:
+          type: integer
+        text:
+          type: string
+        sender_id:
+          type: integer
+        timestamp:
+          type: integer
