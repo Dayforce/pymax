@@ -170,6 +170,7 @@ class ChangeProfilePayload(CamelModel):
     last_name: str | None = None
     description: str | None = None
     photo_token: str | None = None
+    photo_id: int | None = None
     avatar_type: str = "USER_AVATAR"  # TODO: вынести гада в энам
 
 

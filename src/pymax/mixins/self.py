@@ -18,7 +18,7 @@ from pymax.payloads import (
 )
 from pymax.protocols import ClientProtocol
 from pymax.static.enum import Opcode
-from pymax.types import Folder, FolderList, FolderUpdate, Me
+from pymax.types import Folder, FolderList, FolderUpdate, Me, PresetAvatarList
 from pymax.utils import MixinsUtils
 
 
@@ -106,6 +106,69 @@ class SelfMixin(ClientProtocol):
                 by_alias=True,
                 exclude_none=True,
             )
+
+        data = await self._send_and_wait(opcode=Opcode.PROFILE, payload=payload)
+
+        if data.get("payload", {}).get("error"):
+            MixinsUtils.handle_error(data)
+
+        self.me = Me.from_dict(data["payload"]["profile"]["contact"])
+
+        return True
+
+    async def get_preset_avatars(self) -> PresetAvatarList:
+        """
+        Получает список доступных пресет-аватарок.
+
+        :return: Объект PresetAvatarList со списком всех доступных аватарок.
+        :rtype: PresetAvatarList
+        """
+        self.logger.info("Fetching preset avatars")
+
+        data = await self._send_and_wait(
+            opcode=Opcode.PRESET_AVATARS,
+            payload={},
+        )
+
+        if data.get("payload", {}).get("error"):
+            MixinsUtils.handle_error(data)
+
+        return PresetAvatarList.from_dict(data["payload"])
+
+    async def set_preset_avatar(
+        self,
+        photo_id: int,
+        first_name: str | None = None,
+        last_name: str | None = None,
+    ) -> bool:
+        """
+        Устанавливает пресет-аватарку для текущего пользователя.
+
+        :param photo_id: ID пресет-аватарки.
+        :type photo_id: int
+        :param first_name: Новое имя пользователя (опционально, если не передано - берется текущее).
+        :type first_name: str | None
+        :param last_name: Новая фамилия пользователя (опционально).
+        :type last_name: str | None
+        :return: True, если аватарка успешно установлена.
+        :rtype: bool
+        """
+        self.logger.info(f"Setting preset avatar with ID: {photo_id}")
+
+        if first_name is None:
+            first_name = self.me.names[0].first_name if self.me and self.me.names else ""
+        if last_name is None:
+            last_name = self.me.names[0].last_name if self.me and self.me.names else ""
+
+        payload = ChangeProfilePayload(
+            first_name=first_name,
+            last_name=last_name,
+            photo_id=photo_id,
+            avatar_type="PRESET_AVATAR",
+        ).model_dump(
+            by_alias=True,
+            exclude_none=True,
+        )
 
         data = await self._send_and_wait(opcode=Opcode.PROFILE, payload=payload)
 

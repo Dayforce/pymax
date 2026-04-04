@@ -15,7 +15,7 @@ class Opcode(int, Enum):
     SYNC = 21
     CONFIG = 22
     AUTH_CONFIRM = 23  # ✅
-    PRESET_AVATARS = 25
+    PRESET_AVATARS = 25  # ✅
     ASSETS_GET = 26
     ASSETS_UPDATE = 27
     ASSETS_GET_BY_IDS = 28

@@ -1316,3 +1316,54 @@ class ReadState:
     @override
     def __str__(self) -> str:
         return f"ReadState: unread={self.unread}, mark={self.mark}"
+
+
+class PresetAvatar:
+    def __init__(self, url: str, id: int) -> None:
+        self.url = url
+        self.id = id
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Self:
+        return cls(
+            url=data["url"],
+            id=data["id"],
+        )
+
+    @override
+    def __repr__(self) -> str:
+        return f"PresetAvatar(id={self.id!r}, url={self.url!r})"
+
+
+class PresetAvatarGroup:
+    def __init__(self, name: str, avatars: list[PresetAvatar]) -> None:
+        self.name = name
+        self.avatars = avatars
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Self:
+        return cls(
+            name=data["name"],
+            avatars=[PresetAvatar.from_dict(a) for a in data.get("avatars", [])],
+        )
+
+    @override
+    def __repr__(self) -> str:
+        return f"PresetAvatarGroup(name={self.name!r}, avatars={self.avatars!r})"
+
+
+class PresetAvatarList:
+    def __init__(self, current_preset_id: int | None, preset_avatars: list[PresetAvatarGroup]) -> None:
+        self.current_preset_id = current_preset_id
+        self.preset_avatars = preset_avatars
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Self:
+        return cls(
+            current_preset_id=data.get("currentPresetId"),
+            preset_avatars=[PresetAvatarGroup.from_dict(g) for g in data.get("presetAvatars", [])],
+        )
+
+    @override
+    def __repr__(self) -> str:
+        return f"PresetAvatarList(current_preset_id={self.current_preset_id!r}, preset_avatars={self.preset_avatars!r})"
