@@ -116,11 +116,22 @@ Socket connections may be unstable, SSL issues are possible.
 ===============================================================
     """
             )
-        self.logger.info("Connecting to socket %s:%s", self.host, self.port)
+        self.logger.info("Connecting to socket %s:%s (proxy=%s)", self.host, self.port, self.proxy or "direct")
         loop = asyncio.get_running_loop()
-        raw_sock = await loop.run_in_executor(
-            None, lambda: socket.create_connection((self.host, self.port))
-        )
+
+        def _get_socket():
+            if self.proxy:
+                try:
+                    from python_socks.sync import Proxy
+                except ImportError:
+                    self.logger.error("Proxy is set but 'python-socks' is not installed. Use 'pip install python-socks'")
+                    raise RuntimeError("Proxy support requires 'python-socks' library") from None
+                
+                proxy = Proxy.from_url(self.proxy)
+                return proxy.connect(dest_host=self.host, dest_port=self.port)
+            return socket.create_connection((self.host, self.port))
+
+        raw_sock = await loop.run_in_executor(None, _get_socket)
         self._socket = self._ssl_context.wrap_socket(raw_sock, server_hostname=self.host)
         self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
         self.is_connected = True
