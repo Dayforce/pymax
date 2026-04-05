@@ -18,9 +18,9 @@
 ### Аутентификация
 
 - `request_code(phone: str)`: Запрос кода подтверждения на номер телефона.
-- `send_code(code: str, temp_token: str)`: Отправка кода из SMS/сообщения и получение токена авторизации.
-- `login()`: Автоматический процесс логина (используется внутри `start()`).
-- `register(first_name: str, last_name: str = None)`: Регистрация нового аккаунта.
+- `login_with_code(temp_token: str, code: str, start: bool = False)`: Завершает процесс входа с использованием кода.
+- `register(first_name: str, last_name: str = None)`: Регистрация нового аккаунта (интерактивная).
+- `register_with_code(temp_token: str, code: str, first_name: str, last_name: str = None, start: bool = False)`: Завершает процесс регистрации с использованием кода.
 - `logout()`: Выход из аккаунта и аннулирование токена.
 
 ### Сообщения

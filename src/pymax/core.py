@@ -284,6 +284,66 @@ class MaxClient(ApiMixin, WebSocketMixin, BaseClient):
         else:
             self.logger.info("Login successful, token saved to database, exiting...")
 
+    async def register_with_code(
+        self,
+        temp_token: str,
+        code: str,
+        first_name: str,
+        last_name: str | None = None,
+        start: bool = False,
+    ) -> None:
+        """
+        Завершает кастомный registration flow: отправляет код, сохраняет токен и запускает пост-логин задачи.
+
+        :param temp_token: Временный токен, полученный из request_code.
+        :type temp_token: str
+        :param code: Код верификации (6 цифр).
+        :type code: str
+        :param first_name: Имя пользователя для регистрации.
+        :type first_name: str
+        :param last_name: Фамилия пользователя для регистрации.
+        :type last_name: str | None, optional
+        :param start: Флаг запуска пост-логин задач и ожидания навсегда. Если False, только сохраняет токен.
+        :type start: bool, optional
+        :return: None
+        :rtype: None
+        """
+        resp = await self._send_code(code, temp_token)
+
+        reg_attrs = resp.get("tokenAttrs", {}).get("REGISTER", {})
+        token = reg_attrs.get("token")
+
+        if not token:
+            self.logger.error("Registration response did not contain tokenAttrs.REGISTER.token")
+            raise ValueError("Registration response did not contain tokenAttrs.REGISTER.token")
+
+        data = await self._submit_reg_info(first_name, last_name, token)
+        self._token = data.get("token")
+        if not self._token:
+            self.logger.error("Registration final response did not contain token")
+            raise ValueError("Registration final response did not contain token")
+
+        self._database.update_auth_token(self._device_id, self._token)
+        self.logger.info("Registration successful, token saved to database")
+
+        if start:
+            while not self._stop_event.is_set():
+                try:
+                    await self._post_login_tasks()
+                    await self._wait_forever()
+                except Exception:
+                    self.logger.exception("Error during post-registration tasks")
+                finally:
+                    await self._cleanup_client()
+
+                if not self.reconnect or self._stop_event.is_set():
+                    break
+
+                self.logger.info("Reconnecting after post-registration tasks failure")
+                await asyncio.sleep(self.reconnect_delay)
+        else:
+            self.logger.info("Registration complete, token saved to database, exiting...")
+
     async def start(self) -> None:
         """
         Запускает клиент, подключается к WebSocket, авторизует
