@@ -120,16 +120,78 @@ Socket connections may be unstable, SSL issues are possible.
         loop = asyncio.get_running_loop()
 
         def _get_socket():
-            if self.proxy:
-                try:
-                    from python_socks.sync import Proxy
-                except ImportError:
-                    self.logger.error("Proxy is set but 'python-socks' is not installed. Use 'pip install python-socks'")
-                    raise RuntimeError("Proxy support requires 'python-socks' library") from None
+            if not self.proxy:
+                return socket.create_connection((self.host, self.port))
+
+            try:
+                # Парсим URL прокси вручную для кастомной обработки HTTPS прокси
+                proxy_url = self.proxy
+                if "://" not in proxy_url:
+                    proxy_url = f"http://{proxy_url}"
                 
-                proxy = Proxy.from_url(self.proxy)
-                return proxy.connect(dest_host=self.host, dest_port=self.port)
-            return socket.create_connection((self.host, self.port))
+                scheme, rem = proxy_url.split("://", 1)
+                
+                if "@" in rem:
+                    auth, server = rem.split("@", 1)
+                else:
+                    auth, server = None, rem
+                
+                if ":" in server:
+                    p_host, p_port_str = server.split(":", 1)
+                    p_port = int(p_port_str)
+                else:
+                    p_host = server
+                    p_port = 443 if scheme == "https" else 80
+
+                # Для SOCKS все еще лучше использовать специализированную библиотеку
+                if scheme.startswith("socks"):
+                    try:
+                        from python_socks.sync import Proxy
+                    except ImportError:
+                        self.logger.error("Proxy is set but 'python-socks' is not installed. Use 'pip install python-socks'")
+                        raise RuntimeError("Proxy support requires 'python-socks' library") from None
+                    
+                    proxy = Proxy.from_url(proxy_url)
+                    return proxy.connect(dest_host=self.host, dest_port=self.port)
+
+                # Для HTTP и HTTPS прокси реализуем CONNECT вручную
+                # Это позволяет поддерживать "настоящие" HTTPS прокси (TLS внутри TLS)
+                sock = socket.create_connection((p_host, p_port))
+                
+                if scheme == "https":
+                    p_ssl_context = ssl.create_default_context()
+                    p_ssl_context.check_hostname = False
+                    p_ssl_context.verify_mode = ssl.CERT_NONE
+                    sock = p_ssl_context.wrap_socket(sock, server_hostname=p_host)
+                
+                connect_req = f"CONNECT {self.host}:{self.port} HTTP/1.1\r\n"
+                connect_req += f"Host: {self.host}:{self.port}\r\n"
+                if auth:
+                    import base64
+                    auth_b64 = base64.b64encode(auth.encode()).decode()
+                    connect_req += f"Proxy-Authorization: Basic {auth_b64}\r\n"
+                connect_req += "\r\n"
+                
+                sock.sendall(connect_req.encode())
+                
+                # Читаем ответ прокси до конца заголовков
+                resp = b""
+                while b"\r\n\r\n" not in resp:
+                    chunk = sock.recv(4096)
+                    if not chunk:
+                        break
+                    resp += chunk
+                
+                if not resp.startswith(b"HTTP/1.1 200") and not resp.startswith(b"HTTP/1.0 200"):
+                    sock.close()
+                    error_line = resp.split(b"\r\n")[0].decode() if resp else "Empty response"
+                    raise RuntimeError(f"Proxy connection failed: {error_line}")
+                
+                return sock
+
+            except Exception as e:
+                self.logger.error("Failed to connect through proxy %s: %s", self.proxy, e)
+                raise
 
         raw_sock = await loop.run_in_executor(None, _get_socket)
         self._socket = self._ssl_context.wrap_socket(raw_sock, server_hostname=self.host)
